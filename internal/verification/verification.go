@@ -34,7 +34,6 @@ func VerifyJob() {
 				select {
 				case user, ok := <-verificationChannel:
 					if ok {
-						user.VerificationStatus = true
 						_ = storage.Instance().SetAsVerified(user.ID)
 						log.Printf("User %s(%s): verified \n", user.ID, user.Name)
 					} else {
