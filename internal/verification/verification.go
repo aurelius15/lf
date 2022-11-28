@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"log"
 	"sync"
 
 	"github.com/aurelius15/lf/internal/model"
@@ -27,13 +28,20 @@ func VerifyJob() {
 	for i := 0; i < numOfWorkers; i++ {
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
+		Loop:
 			for {
-				if user, ok := <-verificationChannel; ok {
-					user.VerificationStatus = true
-					_, _ = storage.SetAsVerified(user.ID)
-					wg.Done()
-				} else {
-					break
+				select {
+				case user, ok := <-verificationChannel:
+					if ok {
+						user.VerificationStatus = true
+						_, _ = storage.SetAsVerified(user.ID)
+						log.Printf("User %s(%s): verified \n", user.ID, user.Name)
+					} else {
+						break Loop
+					}
+				default:
+					break Loop
 				}
 			}
 		}()

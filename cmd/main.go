@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"time"
 
 	"github.com/aurelius15/lf/internal/model"
@@ -13,7 +14,6 @@ import (
 )
 
 func main() {
-
 	ticker := time.NewTicker(30 * time.Second)
 
 	go func() {
@@ -21,11 +21,15 @@ func main() {
 			select {
 			case <-ticker.C:
 				go func() {
+					log.Println("verify job is started")
 					verification.VerifyJob()
+					log.Println("verify job is finished")
 				}()
 
 				go func() {
+					log.Println("transaction job is started")
 					transaction.TransJob()
+					log.Println("transaction job is finished")
 				}()
 			}
 		}

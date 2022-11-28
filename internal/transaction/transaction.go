@@ -1,7 +1,10 @@
 package transaction
 
 import (
+	"log"
 	"sync"
+
+	"github.com/aurelius15/lf/internal/utils"
 
 	"github.com/aurelius15/lf/internal/storage"
 	"github.com/aurelius15/lf/internal/verification"
@@ -14,27 +17,29 @@ const (
 )
 
 type transaction struct {
-	senderId            string
+	id                  string
 	receiverId          string
+	senderId            string
 	amount              int
 	statusOfTransaction string
 }
 
 var transactionChannel = make(chan *transaction, 1_000)
 
-func CreateTransaction(senderId, receiverId string, amount int) {
+func CreateTransaction(receiverId, senderId string, amount int) {
 	go func() {
 		transactionChannel <- &transaction{
-			senderId:            senderId,
+			id:                  utils.GenerateUUID(),
 			receiverId:          receiverId,
+			senderId:            senderId,
 			amount:              amount,
 			statusOfTransaction: pendingS,
 		}
 	}()
 }
 
-func BaseCheck(userId, senderId string, amount int) bool {
-	receiver, err := storage.GetUser(userId)
+func BaseCheck(receiverId, senderId string, amount int) bool {
+	receiver, err := storage.GetUser(receiverId)
 	if err != nil {
 		return false
 	}
@@ -56,9 +61,11 @@ func BaseCheck(userId, senderId string, amount int) bool {
 		verification.VerifyUser(sender)
 	}
 
+	if sender.Balance < amount {
+		isVerified = false
+	}
+
 	if !isVerified {
-		return false
-	} else if sender.Balance < amount {
 		return false
 	}
 
@@ -84,17 +91,24 @@ func TransJob() {
 	for i := 0; i < numOfWorkers; i++ {
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
+		Loop:
 			for {
-				if t, ok := <-transactionChannel; ok {
-					if BaseCheck(t.receiverId, t.senderId, t.amount) {
-						// load our user and update balance for both of them
-						updateBalanceProcess(t.receiverId, t.senderId, t.amount)
+				select {
+				case t, ok := <-transactionChannel:
+					if ok {
+						if BaseCheck(t.receiverId, t.senderId, t.amount) {
+							updateBalanceProcess(t.receiverId, t.senderId, t.amount)
+							t.statusOfTransaction = processedS
+							log.Printf("Transaction %s(%s->%s %d): processed \n", t.id, t.senderId, t.receiverId, t.amount)
+						} else {
+							log.Printf("Transaction %s(%s->%s %d): did not processed \n", t.id, t.senderId, t.receiverId, t.amount)
+						}
 					} else {
-
+						break Loop
 					}
-					wg.Done()
-				} else {
-					break
+				default:
+					break Loop
 				}
 			}
 		}()
