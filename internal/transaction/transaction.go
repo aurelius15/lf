@@ -39,12 +39,12 @@ func CreateTransaction(receiverId, senderId string, amount int) {
 }
 
 func BaseCheck(receiverId, senderId string, amount int) bool {
-	receiver, err := storage.GetUser(receiverId)
+	receiver, err := storage.Instance().GetUser(receiverId)
 	if err != nil {
 		return false
 	}
 
-	sender, err := storage.GetUser(senderId)
+	sender, err := storage.Instance().GetUser(senderId)
 	if err != nil {
 		return false
 	}
@@ -72,18 +72,6 @@ func BaseCheck(receiverId, senderId string, amount int) bool {
 	return true
 }
 
-func updateBalanceProcess(receiverId, senderId string, amount int) {
-	// atomic ?
-	r, _ := storage.GetUser(receiverId)
-	s, _ := storage.GetUser(senderId)
-
-	r.Balance += amount
-	s.Balance -= amount
-
-	_, _ = storage.SaveUser(r)
-	_, _ = storage.SaveUser(s)
-}
-
 // TransJob (think about errors)
 func TransJob() {
 	var wg sync.WaitGroup
@@ -98,8 +86,8 @@ func TransJob() {
 				case t, ok := <-transactionChannel:
 					if ok {
 						if BaseCheck(t.receiverId, t.senderId, t.amount) {
-							updateBalanceProcess(t.receiverId, t.senderId, t.amount)
-							t.statusOfTransaction = processedS
+							err := storage.Instance().TransferMoney(t.receiverId, t.senderId, t.amount)
+							log.Println(err)
 							log.Printf("Transaction %s(%s->%s %d): processed \n", t.id, t.senderId, t.receiverId, t.amount)
 						} else {
 							log.Printf("Transaction %s(%s->%s %d): did not processed \n", t.id, t.senderId, t.receiverId, t.amount)

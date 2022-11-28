@@ -26,7 +26,8 @@ func CreateUser(c echo.Context) error {
 	}
 
 	user := model.CreateUser(uReq.Name)
-	_, _ = storage.SaveUser(user)
+	storage.Instance().SaveUser(user)
+
 	verification.VerifyUser(user)
 
 	return c.JSON(http.StatusOK, user)
@@ -34,7 +35,7 @@ func CreateUser(c echo.Context) error {
 
 // AllUsers is a handler for getting all users
 func AllUsers(c echo.Context) error {
-	users, _ := storage.GetAllUsers()
+	users := storage.Instance().GetAllUsers()
 
 	return c.JSON(http.StatusOK, users)
 }
@@ -52,6 +53,11 @@ func CreateTransaction(c echo.Context) error {
 
 	if !transaction.BaseCheck(tReq.ReceiverID, tReq.SenderID, tReq.Amount) {
 		return echo.NewHTTPError(http.StatusBadRequest, "transaction can't be processed")
+	}
+
+	err := storage.Instance().FreezeAmount(tReq.SenderID, tReq.Amount)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
 	transaction.CreateTransaction(tReq.ReceiverID, tReq.SenderID, tReq.Amount)
